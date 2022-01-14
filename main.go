@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/sav4enk0r0man/stolon-consul-discovery/api"
 	"log"
@@ -19,12 +18,10 @@ var ErrorLog = log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
 func main() {
 	InfoLog.Println("Starting...")
-	response := api.WaintIndex(clusterName, url, index)
-	indexes := make([]api.Index, 0)
-	err := json.Unmarshal(response, &indexes)
-	if err != nil {
-		ErrorLog.Printf("unmarshal error: %s", err)
-	}
-	fmt.Printf("raw: %s", response)
-	fmt.Printf("decoded: %#v", indexes[0])
+
+	index := api.WaintIndex(clusterName, url, index)
+	fmt.Printf("index: %d\n", index)
+
+	state := api.ClusterState(clusterName, url)
+	fmt.Printf("cluster: %s", state)
 }
