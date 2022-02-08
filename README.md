@@ -1,0 +1,1 @@
+# Consul service discovery for Stolon cluster
