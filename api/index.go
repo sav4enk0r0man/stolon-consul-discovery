@@ -4,7 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sav4enk0r0man/stolon-consul-discovery/client"
+	"github.com/sav4enk0r0man/stolon-consul-discovery/logger"
 )
+
+type context interface {
+	GetConf(string) string
+}
 
 type Index struct {
 	LockIndex   int64  `json:"LockIndex"`
@@ -19,15 +24,27 @@ type IndexesResponse struct {
 	Collection []Index
 }
 
-func WaintIndex(clusterName string, url string, index int64) int64 {
+func WaintIndex(index int64, ctx context) (int64, error) {
+	clusterName := ctx.GetConf("cluster")
+	url := ctx.GetConf("url")
+
 	api := fmt.Sprintf("%s/v1/kv/stolon/cluster/%s/clusterdata?wait=0s&index=%s",
 		url, clusterName, fmt.Sprintf("%d", index))
 
-	response := client.ConsulClient(api)
-	indexes := make([]Index, 0)
-	err := json.Unmarshal(response, &indexes)
+	response, err := client.Get(api, map[string]string{
+		"httptimeout": ctx.GetConf("httptimeout"),
+	})
 	if err != nil {
-		fmt.Printf("unmarshal error: %s", err)
+		if err.Error() == "404" {
+			return 0, logger.Wrapper(err, fmt.Sprintf("Cluster %s not found", clusterName))
+		}
+		return 0, err
 	}
-	return indexes[0].LockIndex
+
+	indexes := make([]Index, 0)
+	if err := json.Unmarshal(response, &indexes); err != nil {
+		return 0, logger.Wrapper(err, err.Error())
+	}
+
+	return indexes[0].ModifyIndex, nil
 }
