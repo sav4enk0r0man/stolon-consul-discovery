@@ -1,27 +1,61 @@
 package main
 
 import (
-	"fmt"
-	"github.com/sav4enk0r0man/stolon-consul-discovery/api"
-	"log"
-	"os"
+	"github.com/sav4enk0r0man/stolon-consul-discovery/config"
+	"github.com/sav4enk0r0man/stolon-consul-discovery/logger"
+	"github.com/sav4enk0r0man/stolon-consul-discovery/state"
 )
-
-const (
-	url         = "http://127.0.0.1:8500"
-	clusterName = "test2-stolon-cluster"
-	index       = 0
-)
-
-var InfoLog = log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
-var ErrorLog = log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
 func main() {
-	InfoLog.Println("Starting...")
+	conf := config.Get()
+	log := logger.NewLogger(conf)
+	cluster := make(chan state.Context)
 
-	index := api.WaintIndex(clusterName, url, index)
-	fmt.Printf("index: %d\n", index)
+	log.Info.Println("Starting...")
+	log.Debug.Printf("Config: %v", conf)
 
-	state := api.ClusterState(clusterName, url)
-	fmt.Printf("cluster: %s", state)
+	if conf.IsSet("cluster") {
+		log.Info.Printf("Single cluster configuration: %v", conf["cluster"])
+
+		go state.Discovery(cluster)
+		cluster <- state.Context{Config: conf, Logger: *log}
+		status := <-cluster
+
+		log.Info.Printf("Worker exited: %s", status.Message)
+		if status.Error != nil {
+			log.Error.Printf("%v\n", status.Error)
+		}
+		log.Debug.Printf("Config: %v", status.Config)
+
+	} else if conf.IsSet("configdir") {
+		log.Info.Printf("Multiple clusters config directory: %v", conf["configdir"])
+
+		confFiles, err := config.WalkDir(conf["configdir"], conf["configmask"])
+		if err != nil {
+			log.Error.Fatal(err)
+		}
+		if len(confFiles) > 0 {
+			log.Info.Printf("Config files: %v", confFiles)
+			for _, confFile := range confFiles {
+				clusterConf := config.Parse(confFile)
+				clusterLog := logger.NewLogger(clusterConf)
+				go state.Discovery(cluster)
+				cluster <- state.Context{Config: clusterConf, Logger: *clusterLog}
+			}
+			for range confFiles {
+				status := <-cluster
+				log.Info.Printf("Worker exited: %s", status.Message)
+				if status.Error != nil {
+					log.Error.Printf("%v\n", status.Error)
+				}
+				log.Debug.Printf("Config: %v", status.Config)
+				log.Info.Printf("Waiting next workers...")
+			}
+		} else {
+			log.Info.Printf("Cluster configuration files (%s/%s) not found...",
+				conf["configdir"], conf["configmask"])
+		}
+	} else {
+		log.Fatal.Fatalf("Cluster name(s) required. Set the -cluster or -config options")
+	}
 }
