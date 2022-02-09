@@ -6,11 +6,52 @@ import (
 	"fmt"
 	"github.com/sav4enk0r0man/stolon-consul-discovery/client"
 	"github.com/sav4enk0r0man/stolon-consul-discovery/logger"
+	"sort"
 )
 
 var (
 	logError = logger.DefaultLog.Error
 )
+
+type ClusterState struct {
+	nodes      []Node
+	serialized string
+}
+
+func NewClusterState() *ClusterState {
+	return &ClusterState{}
+}
+
+func (s *ClusterState) AddNode(n Node) {
+	s.nodes = append(s.nodes, n)
+}
+
+func (s *ClusterState) Nodes() []Node {
+	return s.nodes
+}
+
+func (s *ClusterState) NodeByName(name string) Node {
+	for _, node := range s.nodes {
+		if name == node.name {
+			return node
+		}
+	}
+	return Node{}
+}
+
+func (s *ClusterState) Serialize() {
+	sort.Slice(s.nodes, func(i, j int) bool {
+		return s.nodes[i].Name() < s.nodes[j].Name()
+	})
+	for i := range s.Nodes() {
+		s.nodes[i].Serialize()
+		s.serialized += s.nodes[i].Serialized()
+	}
+}
+
+func (s ClusterState) Serialized() string {
+	return s.serialized
+}
 
 func GetClusterData(ctx context) ([]Index, error) {
 	clusterName := ctx.GetConf("cluster")

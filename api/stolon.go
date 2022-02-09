@@ -1,13 +1,5 @@
 package api
 
-import (
-	"fmt"
-	// "github.com/sav4enk0r0man/stolon-consul-discovery/logger"
-	"sort"
-	"strconv"
-	"strings"
-)
-
 type Cluster struct {
 	Uid        string `json:"uid"`
 	Generation int    `json:"generation"`
@@ -129,93 +121,4 @@ type PgParameters struct {
 	SharedBuffers           string `json:"shared_buffers,omitempty"`
 	Timezone                string `json:"timezone,omitempty"`
 	WalLevel                string `json:"wal_level,omitempty"`
-}
-
-type Node struct {
-	uid        string
-	name       string
-	role       string
-	address    string
-	healthy    bool
-	serialized string
-}
-
-type ClusterState struct {
-	nodes      []Node
-	serialized string
-}
-
-func NewClusterState() *ClusterState {
-	return &ClusterState{}
-}
-
-func (s *ClusterState) AddNode(n Node) {
-	s.nodes = append(s.nodes, n)
-}
-
-func (s *ClusterState) Nodes() []Node {
-	return s.nodes
-}
-
-func (s *ClusterState) NodeByName(name string) Node {
-	for _, node := range s.nodes {
-		if name == node.name {
-			return node
-		}
-	}
-	return Node{}
-}
-
-func NewNode(uid, name, role, address string, healthy bool) *Node {
-	return &Node{
-		uid:     uid,
-		name:    name,
-		role:    role,
-		healthy: healthy,
-		address: address,
-	}
-}
-
-func (n *Node) Serialize() {
-	n.serialized = fmt.Sprintf("[%s,%s]", n.Name(),
-		strings.Join([]string{n.role, n.address,
-			strconv.FormatBool(n.healthy), n.uid}, ","))
-}
-
-func (n Node) Uid() string {
-	return n.uid
-}
-
-func (n Node) Name() string {
-	return n.name
-}
-
-func (n Node) Role() string {
-	return n.role
-}
-
-func (n Node) Address() string {
-	return n.address
-}
-
-func (n Node) Healthy() bool {
-	return n.healthy
-}
-
-func (n Node) Serialized() string {
-	return n.serialized
-}
-
-func (s *ClusterState) Serialize() {
-	sort.Slice(s.nodes, func(i, j int) bool {
-		return s.nodes[i].Name() < s.nodes[j].Name()
-	})
-	for i := range s.Nodes() {
-		s.nodes[i].Serialize()
-		s.serialized += s.nodes[i].Serialized()
-	}
-}
-
-func (s ClusterState) Serialized() string {
-	return s.serialized
 }
