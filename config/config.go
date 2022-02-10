@@ -1,12 +1,15 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/sav4enk0r0man/stolon-consul-discovery/logger"
 	"github.com/zpatrick/go-config"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 var defaults = Options{
@@ -32,14 +35,13 @@ type CLIProvider struct {
 }
 
 var (
-	logInfo  = logger.DefaultLog.Info
 	logError = logger.DefaultLog.Error
 	logDebug = logger.DefaultLog.Debug
 )
 
 var settings Options
 
-func init() {
+func initConfig() {
 	var err error
 	var s Options
 
@@ -55,6 +57,10 @@ func init() {
 		CLIFlag{
 			Name:  "service",
 			Usage: "Service name\n",
+		},
+		CLIFlag{
+			Name:  "services",
+			Usage: "List of service names (separated by commas)\n",
 		},
 		CLIFlag{
 			Name:  "pollinterval",
@@ -89,6 +95,10 @@ func init() {
 			Name:  "logformat",
 			Usage: "Logging prefix format\n",
 		},
+		CLIFlag{
+			Name:  "deregister",
+			Usage: "Deregister all services (any string to apply)\n",
+		},
 	}, s)
 	conf := config.NewConfig([]config.Provider{cli})
 	configFile, _ := conf.String("config")
@@ -111,15 +121,19 @@ func init() {
 	if err != nil {
 		logError.Fatal(err)
 	}
-
-	if _, err = conf.String("service"); err != nil {
-		logError.Fatal(err)
-	}
-
 	settings = cli.override(s)
 
+	var services []string
+	servicesFlag, _ := conf.String("services")
+	if servicesFlag != "" {
+		services = strings.Split(servicesFlag, ",")
+	}
+	if service, err := conf.String("service"); err == nil {
+		services = append(services, service)
+	}
+	settings["services"] = strings.Join(services, ",")
+
 	if settings["logfile"] == "" {
-		// settings["logformat"] = fmt.Sprintf("%%s\t\t\t\t")
 		settings["logformat"] = fmt.Sprintf("%%s\t%s\t", settings["cluster"])
 	}
 }
@@ -212,13 +226,24 @@ func Parse(configFile string) Options {
 			logError.Fatal(err)
 		}
 
-		if _, err = conf.String("service"); err != nil {
-			logError.Fatal(err)
-		}
-	}
+		// if _, err = conf.String("service"); err != nil {
+		// 	logError.Fatal(err)
+		// }
 
-	if settings["logfile"] == "" {
-		s["logformat"] = fmt.Sprintf("%%s\t%s\t", s["cluster"])
+		var services []string
+		servicesFlag, _ := conf.String("services")
+		if servicesFlag != "" {
+			services = strings.Split(servicesFlag, ",")
+		}
+		if service, err := conf.String("service"); err == nil {
+			services = append(services, service)
+		}
+		s["services"] = strings.Join(services, ",")
+
+		if settings["logfile"] == "" {
+			s["logformat"] = fmt.Sprintf("%%s\t%s\t", s["cluster"])
+		}
+		s["configdir"] = ""
 	}
 
 	logDebug.Printf("Cluster %s config: %v", s["cluster"], s)
@@ -236,4 +261,26 @@ func (c CLIProvider) override(o Options) Options {
 		}
 	}
 	return s
+}
+
+func Validate(options Options) (err error) {
+	if options["configdir"] == "" {
+		if options["services"] == "" {
+			return errors.New("one of the required parameters 'service' or 'services' is not set")
+		}
+	}
+
+	if _, err = strconv.Atoi(options["pollinterval"]); err != nil {
+		return errors.New("can't parse pollinterval")
+	}
+
+	if _, err = strconv.Atoi(options["httptimeout"]); err != nil {
+		return errors.New("can't parse httptimeout")
+	}
+
+	return nil
+}
+
+func init() {
+	initConfig()
 }

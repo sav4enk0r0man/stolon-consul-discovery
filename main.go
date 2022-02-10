@@ -9,6 +9,9 @@ import (
 func main() {
 	conf := config.Get()
 	log := logger.NewLogger(conf)
+	if err := config.Validate(conf); err != nil {
+		log.Fatal.Println(err)
+	}
 	cluster := make(chan state.Context)
 
 	log.Info.Println("Starting...")
@@ -39,6 +42,9 @@ func main() {
 			for _, confFile := range confFiles {
 				clusterConf := config.Parse(confFile)
 				clusterLog := logger.NewLogger(clusterConf)
+				if err := config.Validate(clusterConf); err != nil {
+					clusterLog.Fatal.Fatal(err)
+				}
 				go state.Discovery(cluster)
 				cluster <- state.Context{Config: clusterConf, Logger: *clusterLog}
 			}
