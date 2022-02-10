@@ -37,20 +37,31 @@ func Discovery(context chan Context) {
 	conf := ctx.Config
 	log := ctx.Logger
 
-	pollInterval, err := strconv.Atoi(conf["pollinterval"])
-	if err != nil {
+	if conf["deregister"] != "" {
+		var msg string
+		state, err := getClusterState(ctx)
+		if err != nil {
+			msg = fmt.Sprintln("can't get cluster state")
+		} else {
+			for _, node := range state.Nodes() {
+				msg += fmt.Sprintf("\tderegister services: %v for node: %s status: %v",
+					getServices(conf["services"]), node.Name(), DeregisterServices(node, ctx))
+			}
+		}
 		context <- Context{
 			Error:   err,
-			Message: fmt.Sprintln("can't parse pollinterval"),
+			Message: msg,
 			Config:  conf,
 		}
 		return
 	}
 
+	pollInterval, _ := strconv.Atoi(conf["pollinterval"])
+
 	for {
 		time.Sleep(time.Duration(pollInterval) * time.Second)
 
-		index, err = api.WaintIndex(index, ctx)
+		index, err := api.WaintIndex(index, ctx)
 		if err != nil {
 			log.Error.Println(err)
 			continue
@@ -72,11 +83,11 @@ func Discovery(context chan Context) {
 
 		if newClusterState.Serialized() != clusterState.Serialized() {
 			log.Info.Println("State changed")
-			if len(GetMasters(newClusterState)) != 1 {
+			if len(getMasters(newClusterState)) != 1 {
 				log.Info.Println("inconsistent master node state in DCS, skip...")
 				continue
 			}
-			if stringsContains(GetAddresses(newClusterState), "") {
+			if stringsContains(getAddresses(newClusterState), "") {
 				log.Info.Println("node without assigned address, skip...")
 				continue
 			}
@@ -93,21 +104,23 @@ func Discovery(context chan Context) {
 				for _, n := range nodes {
 					oldNodeState := clusterState.NodeByName(n)
 					newNodeState := newClusterState.NodeByName(n)
-					// log.Info.Printf("old cluster node: %v", oldNodeState.Serialized())
-					// log.Info.Printf("new cluster node: %v", newNodeState.Serialized())
 					if oldNodeState.Serialized() != newNodeState.Serialized() {
 						if oldNodeState.Serialized() != "" {
-							log.Info.Printf("Deregister services: %s for node: %s status: %v", conf["service"], n, Deregister(oldNodeState, conf["url"]).Status)
+							log.Info.Printf("Deregister services: %s for node: %s status: %v", getServices(conf["services"]),
+								n, DeregisterServices(oldNodeState, ctx))
 						}
 						if newNodeState.Healthy() {
-							log.Info.Printf("Registered services: %s for node: %s status: %v", conf["service"], n, Register(newNodeState, conf["service"], conf["url"]).Status)
+							log.Info.Printf("Registered services: %s for node: %s status: %v", getServices(conf["services"]),
+								n, RegisterServices(newNodeState, ctx))
 						}
 					}
 				}
 			} else if len(newClusterState.Nodes()) > 0 {
 				for _, n := range newClusterState.Nodes() {
-					log.Info.Printf("Deregister services: %s for node: %s status: %v", conf["service"], n.Name(), Deregister(n, conf["url"]).Status)
-					log.Info.Printf("Registered services: %s for node: %s status: %v", conf["service"], n.Name(), Register(n, conf["service"], conf["url"]).Status)
+					log.Info.Printf("Deregister services: %s for node: %s status: %v", getServices(conf["services"]),
+						n.Name(), DeregisterServices(n, ctx))
+					log.Info.Printf("Registered services: %s for node: %s status: %v", getServices(conf["services"]),
+						n.Name(), RegisterServices(n, ctx))
 				}
 			}
 			clusterState = newClusterState
