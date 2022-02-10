@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	// "github.com/sav4enk0r0man/stolon-consul-discovery/logger"
 	"strconv"
 	"strings"
 )

@@ -18,7 +18,7 @@ func RegisterService(node Node, serviceName, url string) *http.Response {
 	api := fmt.Sprintf("%s/v1/agent/service/register", url)
 
 	var sevice = Service{
-		ID:      node.Name(),
+		ID:      fmt.Sprintf("%s-%s", node.Name(), serviceName),
 		Name:    fmt.Sprintf("postgresql-%s", serviceName),
 		Address: node.Address(),
 		Tags: []string{
@@ -38,8 +38,8 @@ func RegisterService(node Node, serviceName, url string) *http.Response {
 	return resp
 }
 
-func DeregisterService(node Node, url string) *http.Response {
-	api := fmt.Sprintf("%s/v1/agent/service/deregister/%s", url, node.Name())
+func DeregisterService(node Node, serviceName, url string) *http.Response {
+	api := fmt.Sprintf("%s/v1/agent/service/deregister/%s-%s", url, node.Name(), serviceName)
 	resp, err := client.Put(api, []byte{}, map[string]string{})
 	if err != nil {
 
