@@ -2,3 +2,4 @@ stolon-consul-discovery
 conf.d
 deploy.sh
 config*.yml
+*.log
