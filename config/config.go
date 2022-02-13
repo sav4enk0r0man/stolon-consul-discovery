@@ -18,6 +18,7 @@ var defaults = Options{
 	"httptimeout":  "10",
 	"configmask":   "*.yml",
 	"loglevel":     "info",
+	"namepattern":  "postgresql-%s",
 }
 
 type Options map[string]string
@@ -36,7 +37,6 @@ type CLIProvider struct {
 
 var (
 	logError = logger.DefaultLog.Error
-	logDebug = logger.DefaultLog.Debug
 )
 
 var settings Options
@@ -92,6 +92,10 @@ func initConfig() {
 			Usage: "Log file\n",
 		},
 		CLIFlag{
+			Name:  "logerrorfile",
+			Usage: "Log error file\n",
+		},
+		CLIFlag{
 			Name:  "logformat",
 			Usage: "Logging prefix format\n",
 		},
@@ -99,10 +103,13 @@ func initConfig() {
 			Name:  "deregister",
 			Usage: "Deregister all services (any string to apply)\n",
 		},
+		CLIFlag{
+			Name:  "namepattern",
+			Usage: fmt.Sprintf("Pattern for consul discovery service name (%s)\n", defaults.get("namepattern")),
+		},
 	}, s)
 	conf := config.NewConfig([]config.Provider{cli})
 	configFile, _ := conf.String("config")
-	// logInfo.Printf("configFile: %v\n", configFile)
 
 	defaultValues := config.NewStatic(defaults.getAll())
 	conf.Providers = append(conf.Providers, defaultValues)
@@ -135,6 +142,8 @@ func initConfig() {
 
 	if settings["logfile"] == "" {
 		settings["logformat"] = fmt.Sprintf("%%s\t%s\t", settings["cluster"])
+	} else {
+		settings["logformat"] = "%s\t"
 	}
 }
 
@@ -226,10 +235,6 @@ func Parse(configFile string) Options {
 			logError.Fatal(err)
 		}
 
-		// if _, err = conf.String("service"); err != nil {
-		// 	logError.Fatal(err)
-		// }
-
 		var services []string
 		servicesFlag, _ := conf.String("services")
 		if servicesFlag != "" {
@@ -240,13 +245,14 @@ func Parse(configFile string) Options {
 		}
 		s["services"] = strings.Join(services, ",")
 
-		if settings["logfile"] == "" {
+		if s["logfile"] == "" {
 			s["logformat"] = fmt.Sprintf("%%s\t%s\t", s["cluster"])
+		} else {
+			s["logformat"] = "%s\t"
 		}
 		s["configdir"] = ""
 	}
 
-	logDebug.Printf("Cluster %s config: %v", s["cluster"], s)
 	return s
 }
 

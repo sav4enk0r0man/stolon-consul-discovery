@@ -74,37 +74,55 @@ func Wrapper(err error, msg string) error {
 }
 
 func NewLogger(conf map[string]string) *Logger {
+	devNull := ioutil.Discard
+	logFormat := conf["logformat"]
+
 	se := os.Stderr
 	so := os.Stdout
-	devNull := ioutil.Discard
 
-	format := conf["logformat"]
+	if conf["logfile"] != "" {
+		logfile, err := os.OpenFile(conf["logfile"], os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			log.Panic(err)
+		}
+		se = logfile
+		so = logfile
+	}
+
+	if conf["logerrorfile"] != "" {
+		errfile, err := os.OpenFile(conf["logerrorfile"], os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			log.Panic(err)
+		}
+		se = errfile
+	}
+
 	logLevel, err := FromString(conf["loglevel"])
 	if err != nil {
 		log.Fatal(err)
 	}
 	flags := log.Ldate | log.Ltime | log.Lshortfile
 
-	traceLog := log.New(so, fmt.Sprintf(format, TRACE), flags)
+	traceLog := log.New(so, fmt.Sprintf(logFormat, TRACE), flags)
 	if logLevel.Index() < TRACE.Index() {
 		traceLog = log.New(devNull, "", 0)
 	}
 
-	debugLog := log.New(so, fmt.Sprintf(format, DEBUG), flags)
+	debugLog := log.New(so, fmt.Sprintf(logFormat, DEBUG), flags)
 	if logLevel.Index() < DEBUG.Index() {
 		debugLog = log.New(devNull, "", 0)
 	}
 
-	infoLog := log.New(so, fmt.Sprintf(format, INFO), flags)
+	infoLog := log.New(so, fmt.Sprintf(logFormat, INFO), flags)
 	if logLevel.Index() < INFO.Index() {
 		infoLog = log.New(devNull, "", 0)
 	}
 
-	errorLog := log.New(so, fmt.Sprintf(format, ERROR), flags)
+	errorLog := log.New(se, fmt.Sprintf(logFormat, ERROR), flags)
 	if logLevel.Index() < ERROR.Index() {
 		errorLog = log.New(devNull, "", 0)
 	}
-	fatalLog := log.New(se, fmt.Sprintf(format, FATAL), flags)
+	fatalLog := log.New(se, fmt.Sprintf(logFormat, FATAL), flags)
 
 	return &Logger{
 		Fatal: fatalLog,
