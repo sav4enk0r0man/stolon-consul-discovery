@@ -9,10 +9,6 @@ import (
 	"sort"
 )
 
-var (
-	logError = logger.DefaultLog.Error
-)
-
 type ClusterState struct {
 	nodes      []Node
 	serialized string

@@ -48,12 +48,12 @@ func Put(url string, body []byte, opts map[string]string) (*http.Response, error
 
 	request, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(body))
 	if err != nil {
-		logError.Fatalf("create http request: %v\n", err)
+		return nil, logger.Wrapper(err, err.Error())
 	}
 	request.Header.Set("Content-Type", "application/json; charset=utf-8")
 	response, err := httpClient.Do(request)
 	if err != nil {
-		logError.Fatalf("api http request: %v\n", err)
+		return nil, logger.Wrapper(err, err.Error())
 	}
 	defer response.Body.Close()
 

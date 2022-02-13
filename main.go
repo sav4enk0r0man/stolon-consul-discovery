@@ -42,6 +42,7 @@ func main() {
 			for _, confFile := range confFiles {
 				clusterConf := config.Parse(confFile)
 				clusterLog := logger.NewLogger(clusterConf)
+				clusterLog.Debug.Printf("Config: %v", clusterConf)
 				if err := config.Validate(clusterConf); err != nil {
 					clusterLog.Fatal.Fatal(err)
 				}
@@ -54,7 +55,6 @@ func main() {
 				if status.Error != nil {
 					log.Error.Printf("%v\n", status.Error)
 				}
-				log.Debug.Printf("Config: %v", status.Config)
 				log.Info.Printf("Waiting next workers...")
 			}
 		} else {

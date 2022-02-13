@@ -32,26 +32,28 @@ func getAddresses(s api.ClusterState) []string {
 	return addresses
 }
 
-func DeregisterServices(node api.Node, context Context) []string {
+func DeregisterServices(node api.Node, context Context) (status []string, err error) {
 	conf := context.Config
-	// log := context.Logger
 
-	var responses []string
 	for _, service := range getServices(conf["services"]) {
-		resp := api.DeregisterService(node, service, conf["url"])
-		responses = append(responses, resp.Status)
+		resp, err := api.DeregisterService(node, service, conf)
+		if err != nil {
+			return nil, err
+		}
+		status = append(status, resp.Status)
 	}
-	return responses
+	return status, nil
 }
 
-func RegisterServices(node api.Node, context Context) []string {
+func RegisterServices(node api.Node, context Context) (status []string, err error) {
 	conf := context.Config
-	// log := context.Logger
 
-	var responses []string
 	for _, service := range getServices(conf["services"]) {
-		resp := api.RegisterService(node, service, conf["url"])
-		responses = append(responses, resp.Status)
+		resp, err := api.RegisterService(node, service, conf)
+		if err != nil {
+			return nil, err
+		}
+		status = append(status, resp.Status)
 	}
-	return responses
+	return status, nil
 }

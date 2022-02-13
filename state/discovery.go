@@ -44,8 +44,15 @@ func Discovery(context chan Context) {
 			msg = fmt.Sprintln("can't get cluster state")
 		} else {
 			for _, node := range state.Nodes() {
-				msg += fmt.Sprintf("\tderegister services: %v for node: %s status: %v",
-					getServices(conf["services"]), node.Name(), DeregisterServices(node, ctx))
+				msg += fmt.Sprintf("\tderegister services: %v for node: %s status: ",
+					getServices(conf["services"]), node.Name())
+				status, err := DeregisterServices(node, ctx)
+				if err != nil {
+					break
+				} else {
+					msg += fmt.Sprintf("%v", status)
+				}
+
 			}
 		}
 		context <- Context{
@@ -58,6 +65,7 @@ func Discovery(context chan Context) {
 
 	pollInterval, _ := strconv.Atoi(conf["pollinterval"])
 
+DISCOVERY:
 	for {
 		time.Sleep(time.Duration(pollInterval) * time.Second)
 
@@ -106,21 +114,41 @@ func Discovery(context chan Context) {
 					newNodeState := newClusterState.NodeByName(n)
 					if oldNodeState.Serialized() != newNodeState.Serialized() {
 						if oldNodeState.Serialized() != "" {
-							log.Info.Printf("Deregister services: %s for node: %s status: %v", getServices(conf["services"]),
-								n, DeregisterServices(oldNodeState, ctx))
+							msg := fmt.Sprintf("Deregister services: %s for node: %s status:", getServices(conf["services"]), n)
+							status, err := DeregisterServices(oldNodeState, ctx)
+							if err != nil {
+								log.Error.Printf("%s %v", msg, err)
+								continue DISCOVERY
+							}
+							log.Info.Printf("%s %s", msg, status)
 						}
 						if newNodeState.Healthy() {
-							log.Info.Printf("Registered services: %s for node: %s status: %v", getServices(conf["services"]),
-								n, RegisterServices(newNodeState, ctx))
+							msg := fmt.Sprintf("Registered services: %s for node: %s status:", getServices(conf["services"]), n)
+							status, err := RegisterServices(newNodeState, ctx)
+							if err != nil {
+								log.Error.Printf("%s %v", msg, err)
+								continue DISCOVERY
+							}
+							log.Info.Printf("%s %s", msg, status)
 						}
 					}
 				}
 			} else if len(newClusterState.Nodes()) > 0 {
 				for _, n := range newClusterState.Nodes() {
-					log.Info.Printf("Deregister services: %s for node: %s status: %v", getServices(conf["services"]),
-						n.Name(), DeregisterServices(n, ctx))
-					log.Info.Printf("Registered services: %s for node: %s status: %v", getServices(conf["services"]),
-						n.Name(), RegisterServices(n, ctx))
+					msg := fmt.Sprintf("Deregister services: %s for node: %s status:", getServices(conf["services"]), n.Name())
+					status, err := DeregisterServices(n, ctx)
+					if err != nil {
+						log.Error.Printf("%s %v", msg, err)
+					} else {
+						log.Info.Printf("%s %s", msg, status)
+					}
+					msg = fmt.Sprintf("Registered services: %s for node: %s status:", getServices(conf["services"]), n.Name())
+					status, err = RegisterServices(n, ctx)
+					if err != nil {
+						log.Error.Printf("%s %v", msg, err)
+						continue DISCOVERY
+					}
+					log.Info.Printf("%s %s", msg, status)
 				}
 			}
 			clusterState = newClusterState
